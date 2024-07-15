@@ -48,7 +48,7 @@ class TouchRecognizer : UIGestureRecognizer
     Microsoft.Maui.Controls.Element element;        // Forms element for firing events
     UIView view;            // iOS UIView 
     MyTouchEffect touchPlatformEffect;
-
+    List<Point> xfPoints = new List<Point>();
     static Dictionary<UIView, TouchRecognizer> viewDictionary = new();
 
     static Dictionary<long, TouchRecognizer> idToTouchDictionary = new();
@@ -88,13 +88,15 @@ class TouchRecognizer : UIGestureRecognizer
     {
         base.TouchesMoved(touches, evt);
 
-        foreach (UITouch touch in touches.Cast<UITouch>())
+        var uitouches = touches.Cast<UITouch>().ToList();
+        foreach (UITouch touch in uitouches)
         {
             long id = ((IntPtr)touch.Handle).ToInt64();
             CheckForBoundaryHop(touch);
             if (idToTouchDictionary[id] != null)
             {
-                FireEvent(idToTouchDictionary[id], id, TouchActionType.Moved, touch, true);
+                //FireEvent with all the points within the touch event
+                FireEvent(idToTouchDictionary[id], id, TouchActionType.Moved, touch, true, uitouches.IndexOf(touch) == uitouches.Count - 1);
             }
         }
     }
@@ -157,17 +159,22 @@ class TouchRecognizer : UIGestureRecognizer
         }
     }
 
-    void FireEvent(TouchRecognizer recognizer, long id, TouchActionType actionType, UITouch touch, bool isInContact)
+    void FireEvent(TouchRecognizer recognizer, long id, TouchActionType actionType, UITouch touch, bool isInContact, bool shouldFireEvent = true)
     {
         // Convert touch location to Maui Point value
         CGPoint cgPoint = touch.LocationInView(recognizer.View);
         Point xfPoint = new Point(cgPoint.X, cgPoint.Y);
-
+        //Add the points in a list and fireevent with all the points
+        xfPoints.Add(xfPoint);
         // Get the method to call for firing events
         var onTouchAction = recognizer.touchPlatformEffect.OnTouchAction;
 
-        // Call that method
-        onTouchAction(recognizer.element,
-            new TouchActionEventArgs(id, actionType, new[] { xfPoint }, isInContact));
+        if (shouldFireEvent)
+        {
+            // Call that method
+            onTouchAction(recognizer.element,
+            new TouchActionEventArgs(id, actionType, xfPoints.ToArray(), isInContact));
+            xfPoints.Clear();
+        }
     }
 }
